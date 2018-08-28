@@ -1,0 +1,3 @@
+
+class DroneAutoScale
+end
