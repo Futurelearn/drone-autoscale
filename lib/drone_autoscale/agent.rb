@@ -2,23 +2,20 @@ require 'httparty'
 require 'json'
 require 'aws-sdk-autoscaling'
 
-require_relative 'aws_info'
-
 # Runs a single task of setting instance protection for the EC2 instance this
 # service is running on.
 class Agent
-  attr_reader :aws_region, :host, :client, :asg_group, :instance_id
+  attr_reader :aws_region, :host, :client, :group_name_query
 
   def initialize(
     host: 'http://localhost:3000',
     aws_region: 'eu-west-1',
-    asg_group_lookup: 'drone-agent'
+    group_name_query: 'drone-agent'
   )
     @aws_region = aws_region
     @host = host
+    @group_name_query = group_name_query
     @client = Aws::AutoScaling::Client.new(region: aws_region)
-    @asg_group = AwsInfo.new(group_name_query: asg_group_lookup).autoscaling_group_name
-    @instance_id = AwsInfo.new.instance_id
   end
 
   def api
@@ -26,59 +23,65 @@ class Agent
     JSON.parse(HTTParty.get(endpoint))
   end
 
+  def instance_id
+    HTTParty.get('http://169.254.169.254/latest/meta-data/instance-id').body
+  end
+
+  def all_autoscaling_groups
+    groups = []
+    resp = client.describe_auto_scaling_groups['auto_scaling_groups']
+    resp.select { |g| groups << g['auto_scaling_group_name'] }
+    groups
+  end
+
+  def autoscaling_group_name
+    all_autoscaling_groups.grep(Regexp.new(group_name_query)).first
+  end
+
   def job_running?
-    if api['running_count'] > 0
-      true
-    else
-      false
-    end
+    api['running_count'].positive?
   end
 
   def instance_protection_enabled?
-    begin
-      Aws::AutoScaling::Instance.new(
-        region: aws_region,
-        group_name: asg_group,
-        id: instance_id
-      ).
-        protected_from_scale_in
-    rescue Aws::AutoScaling::Errors::ServiceError => e
-      abort(e)
-    end
+    Aws::AutoScaling::Instance.new(
+      region: aws_region,
+      group_name: autoscaling_group_name,
+      id: instance_id
+    ).protected_from_scale_in
   end
 
   def enable_instance_protection
-    begin
-      client.set_instance_protection({
-        auto_scaling_group_name: asg_group,
-        instance_ids: [instance_id],
-        protected_from_scale_in: true
-      })
-    rescue Aws::AutoScaling::Errors::ServiceError => e
-      abort(e)
-    end
+    client.set_instance_protection(
+      auto_scaling_group_name: autoscaling_group_name,
+      instance_ids: [instance_id],
+      protected_from_scale_in: true
+    )
   end
 
   def disable_instance_protection
-    begin
-      client.set_instance_protection({
-        auto_scaling_group_name: asg_group,
-        instance_ids: [instance_id],
-        protected_from_scale_in: false
-      })
-    rescue Aws::AutoScaling::Errors::ServiceError => e
-      abort(e)
-    end
+    client.set_instance_protection(
+      auto_scaling_group_name: autoscaling_group_name,
+      instance_ids: [instance_id],
+      protected_from_scale_in: false
+    )
   end
 
   def run
     if job_running?
-      unless instance_protection_enabled?
+      if instance_protection_enabled?
+        return false
+      else
         enable_instance_protection
+        puts "Instance protection enabled on #{instance_id}"
+        return true
       end
     else
       if instance_protection_enabled?
         disable_instance_protection
+        puts "Instance protection disabled on #{instance_id}"
+        return true
+      else
+        return false
       end
     end
   end
