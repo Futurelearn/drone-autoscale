@@ -25,6 +25,7 @@ GEM
     httparty (0.16.2)
       multi_xml (>= 0.5.2)
     jmespath (1.4.0)
+    logger (1.2.8)
     method_source (0.9.0)
     multi_xml (0.6.0)
     pry (0.11.3)
@@ -45,6 +46,7 @@ GEM
       rspec-support (~> 3.8.0)
     rspec-support (3.8.0)
     safe_yaml (1.0.4)
+    thor (0.20.0)
     timecop (0.9.1)
     webmock (3.4.2)
       addressable (>= 2.3.6)
@@ -58,8 +60,10 @@ DEPENDENCIES
   aws-sdk-autoscaling
   aws-sdk-cloudwatch
   httparty
+  logger
   pry
   rspec
+  thor
   timecop
   webmock
 

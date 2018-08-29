@@ -9,8 +9,9 @@ class Server
     aws_region: 'eu-west-1',
     host: 'http://localhost',
     namespace: 'Drone',
-    drone_api_token:
+    drone_api_token: nil
   )
+    abort("Error: must provide Drone API token") if drone_api_token.nil?
     @client = Aws::CloudWatch::Client.new(region: aws_region)
     @host = host
     @namespace = namespace
@@ -42,30 +43,24 @@ class Server
 
   def add_metrics(metrics = {})
     # metrics should be hash of names and values
-    begin
-      metric_array = []
-      metrics.each do |name, value|
-        metric_array << {
-          metric_name: name.to_s,
-          timestamp: Time.now,
-          value: value,
-          unit: 'Count',
-          storage_resolution: 1
-        }
-      end
+    metric_array = []
+    metrics.each do |name, value|
+      metric_array << {
+        metric_name: name.to_s,
+        timestamp: Time.now,
+        value: value,
+        unit: 'Count',
+        storage_resolution: 1
+      }
+    end
 
-      client.put_metric_data(
-        namespace: namespace,
-        metric_data: metric_array
-      )
+    client.put_metric_data(
+      namespace: namespace,
+      metric_data: metric_array
+    )
 
-      metrics.each do |name, value|
-        puts "#{namespace}: #{name} -> #{value}"
-      end
-      true
-    rescue Aws::CloudWatch::Errors::ServiceError => e
-      puts e
-      false
+    metrics.each do |name, value|
+      Logger.new(STDOUT).info "#{namespace}: #{name} -> #{value}"
     end
   end
 

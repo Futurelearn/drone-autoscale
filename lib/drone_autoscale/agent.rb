@@ -72,13 +72,13 @@ class Agent
         return false
       else
         enable_instance_protection
-        puts "Instance protection enabled on #{instance_id}"
+        Logger.new(STDOUT).info "Instance protection enabled on #{instance_id}"
         return true
       end
     else
       if instance_protection_enabled?
         disable_instance_protection
-        puts "Instance protection disabled on #{instance_id}"
+        Logger.new(STDOUT).info "Instance protection disabled on #{instance_id}"
         return true
       else
         return false
