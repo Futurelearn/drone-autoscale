@@ -62,6 +62,8 @@ class Server
     metrics.each do |name, value|
       Logger.new(STDOUT).info "#{namespace}: #{name} -> #{value}"
     end
+    # return true if we get to the end without errors
+    true
   end
 
   def run
