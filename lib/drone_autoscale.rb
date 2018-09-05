@@ -26,7 +26,7 @@ class DroneAutoScale < Thor
   method_option :host, default: ENV['DRONE_AUTOSCALE_HOST'] || 'http://localhost'
   method_option :aws_region, default: ENV['DRONE_AUTOSCALE_AWS_REGION'] || 'eu-west-1'
   method_option :namespace, default: ENV['DRONE_AUTOSCALE_NAMESPACE'] || 'Drone'
-  method_option :drone_api_token, default: ENV['DRONE_API_TOKEN']
+  method_option :drone_api_token, default: ENV['DRONE_AUTOSCALE_API_TOKEN']
   method_option :polling_time, type: :numeric, default: ENV['DRONE_AUTOSCALE_POLLING_TIME'] || '20'
   def server
     Logger.new(STDOUT).info "Server: started"
