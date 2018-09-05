@@ -1,0 +1,16 @@
+pipeline:
+  test:
+    image: ruby:2.5.1
+    commands:
+      - bundle install
+      - bundle exec rspec spec/
+
+  docker build master:
+    image: plugins/docker
+    repo: futurelearn/drone-autoscale
+    tags:
+      - latest
+      - "${DRONE_BUILD_NUMBER}"
+    secrets: [ docker_username, docker_password ]
+    when:
+      branch: master
