@@ -11,7 +11,7 @@ class Server
     namespace: 'Drone',
     drone_api_token: nil
   )
-    abort("Error: must provide Drone API token") if drone_api_token.nil?
+    raise StandardError.new("Must provide Drone API token") if drone_api_token.nil?
     @client = Aws::CloudWatch::Client.new(region: aws_region)
     @host = host
     @namespace = namespace

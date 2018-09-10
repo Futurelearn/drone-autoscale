@@ -13,11 +13,16 @@ class DroneAutoScale < Thor
   def agent
     Logger.new(STDOUT).info "Agent: started"
     loop do
-      Agent.new(
-        host: options[:host],
-        aws_region: options[:aws_region],
-        group_name_query: options[:group_name_query]
-      ).run
+      begin
+        Agent.new(
+          host: options[:host],
+          aws_region: options[:aws_region],
+          group_name_query: options[:group_name_query]
+        ).run
+      rescue => e
+        Logger.new(STDERR).error e.to_s
+        abort
+      end
       sleep(options[:polling_time].to_i)
     end
   end
@@ -31,12 +36,17 @@ class DroneAutoScale < Thor
   def server
     Logger.new(STDOUT).info "Server: started"
     loop do
-      Server.new(
-        host: options[:host],
-        aws_region: options[:aws_region],
-        namespace: options[:namespace],
-        drone_api_token: options[:drone_api_token]
-      ).run
+      begin
+        Server.new(
+          host: options[:host],
+          aws_region: options[:aws_region],
+          namespace: options[:namespace],
+          drone_api_token: options[:drone_api_token]
+        ).run
+      rescue => e
+        Logger.new(STDERR).error e.to_s
+        abort
+      end
       sleep(options[:polling_time].to_i)
     end
   end
