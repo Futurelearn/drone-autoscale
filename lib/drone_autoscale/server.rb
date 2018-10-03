@@ -29,6 +29,34 @@ class Server
     api_stats['worker_count']
   end
 
+  def office_hours
+    return false if Date.today.saturday? || Date.today.sunday?
+
+    Time.now < Time.parse('7pm') && Time.now > Time.parse('7am')
+  end
+
+  def required_workers
+    # If there is more than 1 pending jobs, return the amount
+    # for rapid scaling up
+    return pending_jobs if pending_jobs >= 1
+
+    if office_hours
+      # There are no idle workers, create one
+      if idle_workers.zero?
+        return 1
+      # Remove all idle workers except one if there is more than one
+      elsif idle_workers > 1
+        return -idle_workers + 1
+      end
+    else
+      # If there is an idle worker, return the idle workers we wish to remove
+      return -idle_workers if idle_workers.positive?
+    end
+
+    # Do nothing by default
+    0
+  end
+
   def pending_jobs
     api_stats['pending_count']
   end
@@ -69,6 +97,7 @@ class Server
   def run
     metrics = {
       IdleWorkers: idle_workers,
+      RequiredWorkers: required_workers,
       RunningJobs: running_jobs,
       PendingJobs: pending_jobs,
       TotalJobs: total_jobs
