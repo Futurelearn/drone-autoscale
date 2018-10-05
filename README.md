@@ -23,12 +23,13 @@ Cloudwatch](https://aws.amazon.com/cloudwatch/) as gathered using the [Drone
 API](http://docs.drone.io/api-overview/).
 
 This mode assumes that your server instance has access to write metrics to
-Cloudwatch. It does not provide any dimensions and simply adds 4 basic metrics:
+Cloudwatch. It does not provide any dimensions and simply adds 5 basic metrics:
 
 - `IdleWorkers`
 - `RunningJobs`
 - `PendingJobs`
 - `TotalJobs`
+- `RequiredWorkers`
 
 The following IAM role should be sufficient:
 
@@ -137,15 +138,3 @@ services:
 
 See the [AWS documentation on
 autoscaling](https://docs.aws.amazon.com/autoscaling/ec2/userguide/GettingStartedTutorial.html).
-
-Below I describe how I have configured autoscaling for our requirements. This
-may not suit your needs.
-
-The instance protection will stop instances being terminated when they are
-running a build so scaling in is safe to use.
-
-To scale out, I monitor the `PendingJobs` metric and add an instance if the
-metric `> 0` (using 1 datapoint per period for the quickest possible boot).
-
-To scale in, I monitor the `IdleWorkers` metric and **slowly** remove one
-instance at a time if the metric is `> 0`.
