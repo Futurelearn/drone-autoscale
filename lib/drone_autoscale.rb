@@ -13,7 +13,7 @@ class DroneAutoScale
       opt :group_name_query, "Name or pattern of the Drone worker autoscaling group", type: :string, default: ENV['DRONE_AUTOSCALE_GROUP_NAME_QUERY'] || 'drone-agent'
       opt :host, "Drone server endpoint", type: :string, default: ENV['DRONE_AUTOSCALE_HOST'] || 'http://localhost'
       opt :namespace, "Cloudwatch namespace to add metrics to", type: :string, default: ENV['DRONE_AUTOSCALE_NAMESPACE'] || 'Drone'
-      opt :polling_time, "How often to poll the API", type: :int, default: ENV['DRONE_AUTOSCALE_POLLING_TIME'] || 5
+      opt :polling_time, "How often to poll the API", type: :string, default: ENV['DRONE_AUTOSCALE_POLLING_TIME'] || "5"
     end
   end
 
