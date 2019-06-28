@@ -1,10 +1,10 @@
 source "https://rubygems.org"
 
-gem "aws-sdk-cloudwatch"
 gem "aws-sdk-autoscaling"
+gem "aws-sdk-cloudwatch"
 gem "httparty"
-gem "thor"
 gem "logger"
+gem "optimist"
 
 group :development, :test do
   gem "rspec"

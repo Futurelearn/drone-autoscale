@@ -1,8 +1,6 @@
 #!/usr/bin/env ruby
 
-require 'thor'
-
 require_relative '../lib/drone_autoscale'
 
 $stdout.sync = true
-DroneAutoScale.start(ARGV)
+DroneAutoScale.daemon
