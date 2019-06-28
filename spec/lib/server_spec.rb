@@ -1,50 +1,63 @@
 require 'spec_helper'
+require 'aws-sdk-autoscaling'
 require 'webmock/rspec'
 require 'timecop'
 require 'json'
 
 require 'drone_autoscale/server'
 
-RSpec.describe Server do
-  let(:api_endpoint) { "http://localhost/api/info/queue" }
+RSpec.describe Metrics do
+  let(:api_endpoint) { "http://localhost/api/queue" }
   let(:drone_api_token) { "some-fake-token" }
-  let(:default_stats) do
-    {
-      "pending": "null",
-      "running": "null",
-      "stats": {
-        "worker_count": 0,
-        "pending_count": 2,
-        "running_count": 5,
-        "completed_count": 0
-      }
-    }
-  end
+  let(:api_result) { File.read('spec/fixtures/files/default_api.json') }
 
-  let(:client) { double(:client) }
+  let(:asg) { Aws::AutoScaling::Client.new(stub_responses: true) }
+  let(:cloudwatch) { double(:cloudwatch) }
 
   before(:each) do
-    allow(Aws::CloudWatch::Client).to receive(:new).and_return(client)
-    stub_request(:get, api_endpoint).to_return(body: JSON.dump(default_stats))
+    allow(Aws::CloudWatch::Client).to receive(:new).and_return(cloudwatch)
+    allow(Aws::AutoScaling::Client).to receive(:new).and_return(asg)
+    asg.stub_responses(:describe_auto_scaling_instances, {
+      auto_scaling_instances: [
+        {
+          instance_id: "foo",
+          auto_scaling_group_name: "drone-agent",
+          availability_zone: "eu-west-2b",
+          lifecycle_state: "InService",
+          health_status: "HEALTHY",
+          launch_configuration_name: nil,
+          launch_template: nil,
+          protected_from_scale_in: false
+        },
+        {
+          instance_id: "bar",
+          auto_scaling_group_name: "drone-agent",
+          availability_zone: "eu-west-2c",
+          lifecycle_state: "InService",
+          health_status: "HEALTHY",
+          launch_configuration_name: nil,
+          launch_template: nil,
+          protected_from_scale_in: false
+        }
+      ]
+    })
+
+    stub_request(:get, api_endpoint).to_return(body: JSON.dump(api_result))
   end
 
   subject { described_class.new(drone_api_token: drone_api_token) }
 
-  describe '#api_stats' do
+  describe '#api' do
     it 'should contain the authorization header' do
-      subject.api_stats
+      subject.api
       expect(WebMock).to have_requested(:get, api_endpoint).with { |request|
         expect(request.headers).to include('Authorization' => 'some-fake-token')
       }
     end
 
-    it 'returns JSON of worker stats' do
-      result = subject.api_stats
-      expect(result).to include(
-        'worker_count' => 0,
-        'pending_count' => 2,
-        'running_count' => 5,
-      )
+    it 'returns JSON of build queue' do
+      result = subject.api
+      expect(result).to eq(JSON.load(api_result))
     end
   end
 
@@ -65,63 +78,27 @@ RSpec.describe Server do
         Timecop.return
       end
 
-      it 'If pending jobs is 1 or more, return the number of pending jobs' do
+      it 'if pending jobs is 1 or more, return the number of pending jobs' do
         stub_request(:get, api_endpoint)
-          .to_return(body: JSON.dump(
-            "pending": "null",
-            "running": "null",
-            "stats": {
-              "worker_count": 0,
-              "pending_count": 4,
-              "running_count": 2,
-              "completed_count": 0
-            }
-          ))
+          .to_return(body: File.read('spec/fixtures/files/pending_api.json'))
         expect(subject.required_workers).to eq(4)
       end
 
-      it 'If idle workers is 0, create a worker' do
+      it 'if idle workers is 0, create a worker' do
         stub_request(:get, api_endpoint)
-          .to_return(body: JSON.dump(
-            "pending": "null",
-            "running": "null",
-            "stats": {
-              "worker_count": 0,
-              "pending_count": 0,
-              "running_count": 1,
-              "completed_count": 0
-            }
-          ))
+          .to_return(body: File.read('spec/fixtures/files/two_running_api.json'))
         expect(subject.required_workers).to eq(1)
       end
 
-      it 'If there is more than 1 idle worker, remove all but one.' do
-        stub_request(:get, api_endpoint)
-          .to_return(body: JSON.dump(
-            "pending": "null",
-            "running": "null",
-            "stats": {
-              "worker_count": 3,
-              "pending_count": 0,
-              "running_count": 0,
-              "completed_count": 0
-            }
-          ))
-        expect(subject.required_workers).to eq(-2)
+      it 'if there is more than 1 idle worker, remove all but one.' do
+        # No jobs are running and we have 2 workers
+        stub_request(:get, api_endpoint).to_return(body: "[]")
+        expect(subject.required_workers).to eq(-1)
       end
 
       it 'If there is 1 idle worker exactly, do nothing.' do
         stub_request(:get, api_endpoint)
-          .to_return(body: JSON.dump(
-            "pending": "null",
-            "running": "null",
-            "stats": {
-              "worker_count": 1,
-              "pending_count": 0,
-              "running_count": 3,
-              "completed_count": 0
-            }
-          ))
+          .to_return(body: File.read('spec/fixtures/files/one_running_api.json'))
         expect(subject.required_workers).to eq(0)
       end
     end
@@ -135,54 +112,28 @@ RSpec.describe Server do
       end
 
       it 'if there is one or more pending jobs, return the pending jobs' do
-        stub_request(:get, api_endpoint)
-          .to_return(body: JSON.dump(
-            "pending": "null",
-            "running": "null",
-            "stats": {
-              "worker_count": 0,
-              "pending_count": 2,
-              "running_count": 0,
-              "completed_count": 0
-            }
-          ))
+        stub_request(:get, api_endpoint).to_return(body: api_result)
         expect(subject.required_workers).to eq(2)
       end
 
       it 'if there is 1 or more idle workers, remove them all' do
-        stub_request(:get, api_endpoint)
-          .to_return(body: JSON.dump(
-            "pending": "null",
-            "running": "null",
-            "stats": {
-              "worker_count": 3,
-              "pending_count": 0,
-              "running_count": 0,
-              "completed_count": 0
-            }
-          ))
-        expect(subject.required_workers).to eq(-3)
+        # 2 workers and no jobs
+        stub_request(:get, api_endpoint).to_return(body: "[]")
+        expect(subject.required_workers).to eq(-2)
       end
 
       it 'if nothing is happening, do nothing' do
-        stub_request(:get, api_endpoint)
-          .to_return(body: JSON.dump(
-            "pending": "null",
-            "running": "null",
-            "stats": {
-              "worker_count": 0,
-              "pending_count": 0,
-              "running_count": 0,
-              "completed_count": 0
-            }
-          ))
+        stub_request(:get, api_endpoint).to_return(body: "[]")
+        asg.stub_responses(:describe_auto_scaling_instances, {
+          auto_scaling_instances: []
+        })
         expect(subject.required_workers).to eq(0)
       end
     end
   end
 
   before do
-    stub_request(:get, api_endpoint).to_return(body: JSON.dump(default_stats))
+    stub_request(:get, api_endpoint).to_return(body: api_result)
   end
 
   describe '#pending_jobs' do
@@ -251,7 +202,7 @@ RSpec.describe Server do
       ]
     }}
     it 'should put metric data for all metrics' do
-      allow(client).to receive(:put_metric_data).with(metrics)
+      allow(cloudwatch).to receive(:put_metric_data).with(metrics)
       expect(subject.run).to eq(true)
     end
   end

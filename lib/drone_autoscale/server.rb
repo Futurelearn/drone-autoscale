@@ -1,34 +1,43 @@
+require 'aws-sdk-autoscaling'
 require 'aws-sdk-cloudwatch'
 require 'json'
 require 'httparty'
 
 class Server
-  attr_reader :host, :drone_api_token, :namespace, :client, :enable_office_hours
+  attr_reader :host, :drone_api_token, :namespace, :cloudwatch, :asg, :group_name_query, :enable_office_hours
 
   def initialize(
     aws_region: 'eu-west-1',
+    drone_api_token: nil,
+    group_name_query: 'drone-agent',
     host: 'http://localhost',
     namespace: 'Drone',
-    drone_api_token: nil,
     enable_office_hours: true
   )
     raise StandardError.new("Must provide Drone API token") if drone_api_token.nil?
-    @client = Aws::CloudWatch::Client.new(region: aws_region)
+    @cloudwatch = Aws::CloudWatch::Client.new(region: aws_region)
+    @asg = Aws::AutoScaling::Client.new(region: aws_region)
     @host = host
     @namespace = namespace
     @drone_api_token = drone_api_token
+    @group_name_query = group_name_query
     @enable_office_hours = enable_office_hours
   end
 
-  def api_stats
-    api_url = "#{host}/api/info/queue"
+  def api
+    api_url = "#{host}/api/queue"
     headers = { Authorization: drone_api_token }
-    result = JSON.parse(HTTParty.get(api_url, headers: headers).body)
-    result['stats']
+    JSON.load(HTTParty.get(api_url, headers: headers).body)
+  end
+
+  def current_worker_count
+    asg.describe_auto_scaling_instances.auto_scaling_instances.select {|s| s.auto_scaling_group_name =~ /^#{group_name_query}.*$/ && s.lifecycle_state =~ /^InService|Pending$/ }.length
   end
 
   def idle_workers
-    api_stats['worker_count']
+    idle = current_worker_count - total_jobs
+    return 0 if idle < 0
+    idle
   end
 
   def office_hours
@@ -62,15 +71,15 @@ class Server
   end
 
   def pending_jobs
-    api_stats['pending_count']
+    api.select { |a| a['status'] == 'pending' }.length
   end
 
   def running_jobs
-    api_stats['running_count']
+    api.select { |a| a['status'] == 'running' }.length
   end
 
   def total_jobs
-    pending_jobs + running_jobs
+    api.length
   end
 
   def add_metrics(metrics = {})
@@ -86,7 +95,7 @@ class Server
       }
     end
 
-    client.put_metric_data(
+    cloudwatch.put_metric_data(
       namespace: namespace,
       metric_data: metric_array
     )
