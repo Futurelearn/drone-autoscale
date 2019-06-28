@@ -1,7 +1,7 @@
 require 'thor'
 
-require_relative 'drone_autoscale/agent'
-require_relative 'drone_autoscale/server'
+require_relative 'drone_autoscale/instance_protection'
+require_relative 'drone_autoscale/metrics'
 
 class DroneAutoScale < Thor
   package_name 'drone-autoscale'
@@ -14,7 +14,7 @@ class DroneAutoScale < Thor
     Logger.new(STDOUT).info "Agent: started"
     loop do
       begin
-        Agent.new(
+        InstanceProtection.new(
           host: options[:host],
           aws_region: options[:aws_region],
           group_name_query: options[:group_name_query]
@@ -38,7 +38,7 @@ class DroneAutoScale < Thor
     Logger.new(STDOUT).info "Server: started"
     loop do
       begin
-        Server.new(
+        Metrics.new(
           host: options[:host],
           aws_region: options[:aws_region],
           namespace: options[:namespace],

@@ -3,7 +3,7 @@ require 'aws-sdk-cloudwatch'
 require 'json'
 require 'httparty'
 
-class Server
+class Metrics
   attr_reader :host, :drone_api_token, :namespace, :cloudwatch, :asg, :group_name_query, :enable_office_hours
 
   def initialize(

@@ -1,9 +1,9 @@
 require 'spec_helper'
 require 'webmock/rspec'
 
-require 'drone_autoscale/agent'
+require 'drone_autoscale/instance_protection'
 
-RSpec.describe Agent do
+RSpec.describe InstanceProtection do
   let(:ec2_metadata_host) { 'http://169.254.169.254/latest/meta-data/instance-id' }
   let(:endpoint) { "#{host}/varz" }
   let(:host) { "http://localhost:3000" }

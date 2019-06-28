@@ -2,9 +2,7 @@ require 'httparty'
 require 'json'
 require 'aws-sdk-autoscaling'
 
-# Runs a single task of setting instance protection for the EC2 instance this
-# service is running on.
-class Agent
+class InstanceProtection
   attr_reader :aws_region, :host, :client, :group_name_query
 
   def initialize(

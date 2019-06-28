@@ -4,7 +4,7 @@ require 'webmock/rspec'
 require 'timecop'
 require 'json'
 
-require 'drone_autoscale/server'
+require 'drone_autoscale/metrics'
 
 RSpec.describe Metrics do
   let(:api_endpoint) { "http://localhost/api/queue" }
