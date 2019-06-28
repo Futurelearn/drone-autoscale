@@ -42,7 +42,7 @@ RSpec.describe Metrics do
       ]
     })
 
-    stub_request(:get, api_endpoint).to_return(body: JSON.dump(api_result))
+    stub_request(:get, api_endpoint).to_return(body: api_result)
   end
 
   subject { described_class.new(drone_api_token: drone_api_token) }

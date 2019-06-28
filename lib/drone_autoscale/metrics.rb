@@ -1,7 +1,7 @@
 require 'aws-sdk-autoscaling'
 require 'aws-sdk-cloudwatch'
-require 'json'
-require 'httparty'
+
+require_relative 'api'
 
 class Metrics
   attr_reader :host, :drone_api_token, :namespace, :cloudwatch, :asg, :group_name_query, :enable_office_hours
@@ -14,7 +14,6 @@ class Metrics
     namespace: 'Drone',
     enable_office_hours: true
   )
-    raise StandardError.new("Must provide Drone API token") if drone_api_token.nil?
     @cloudwatch = Aws::CloudWatch::Client.new(region: aws_region)
     @asg = Aws::AutoScaling::Client.new(region: aws_region)
     @host = host
@@ -25,9 +24,7 @@ class Metrics
   end
 
   def api
-    api_url = "#{host}/api/queue"
-    headers = { Authorization: drone_api_token }
-    JSON.load(HTTParty.get(api_url, headers: headers).body)
+    API.new(host: host, drone_api_token: drone_api_token).queue
   end
 
   def current_worker_count

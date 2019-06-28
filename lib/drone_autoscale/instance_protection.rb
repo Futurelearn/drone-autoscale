@@ -2,85 +2,63 @@ require 'httparty'
 require 'json'
 require 'aws-sdk-autoscaling'
 
+require_relative 'api'
+
 class InstanceProtection
-  attr_reader :aws_region, :host, :client, :group_name_query
+  attr_reader :aws_region, :drone_api_token, :host, :asg, :group_name_query
 
   def initialize(
-    host: 'http://localhost:3000',
     aws_region: 'eu-west-1',
-    group_name_query: 'drone-agent'
+    drone_api_token: nil,
+    group_name_query: 'drone-agent',
+    host: 'http://localhost'
   )
     @aws_region = aws_region
+    @drone_api_token = drone_api_token
     @host = host
     @group_name_query = group_name_query
-    @client = Aws::AutoScaling::Client.new(region: aws_region)
+    @asg = Aws::AutoScaling::Client.new(region: aws_region)
   end
 
   def api
-    endpoint = "#{host}/varz"
-    JSON.parse(HTTParty.get(endpoint))
-  end
-
-  def instance_id
-    HTTParty.get('http://169.254.169.254/latest/meta-data/instance-id').body
-  end
-
-  def all_autoscaling_groups
-    groups = []
-    resp = client.describe_auto_scaling_groups['auto_scaling_groups']
-    resp.select { |g| groups << g['auto_scaling_group_name'] }
-    groups
+    API.new(host: host, drone_api_token: drone_api_token).queue
   end
 
   def autoscaling_group_name
-    all_autoscaling_groups.grep(Regexp.new(group_name_query)).first
+    asg.describe_auto_scaling_groups.auto_scaling_groups.detect {|g| g.auto_scaling_group_name =~ /^#{group_name_query}.*$/ }.auto_scaling_group_name
   end
 
-  def job_running?
-    api['running_count'].positive?
+  # List all worker instance IDs in an autoscaling group
+  def all_available_worker_ids
+    asg.describe_auto_scaling_instances.auto_scaling_instances.select {|s| s.auto_scaling_group_name == autoscaling_group_name && s.lifecycle_state =~ /^InService|Pending$/ }.map(&:instance_id)
   end
 
-  def instance_protection_enabled?
-    Aws::AutoScaling::Instance.new(
-      region: aws_region,
-      group_name: autoscaling_group_name,
-      id: instance_id
-    ).protected_from_scale_in
+  def busy_worker_ids
+    api.map {|x| x['machine'] }.compact
   end
 
-  def enable_instance_protection
-    client.set_instance_protection(
+  def free_worker_ids
+    all_available_worker_ids - busy_worker_ids
+  end
+
+  def update_instance_protection(instance_ids, enabled)
+    return if instance_ids.empty?
+
+    if enabled
+      Logger.new(STDOUT).info "Enabling instance protection on #{instance_ids.join(' ')}"
+    else
+      Logger.new(STDOUT).info "Disabling instance protection on #{instance_ids.join(' ')}"
+    end
+
+    asg.set_instance_protection(
       auto_scaling_group_name: autoscaling_group_name,
-      instance_ids: [instance_id],
-      protected_from_scale_in: true
-    )
-  end
-
-  def disable_instance_protection
-    client.set_instance_protection(
-      auto_scaling_group_name: autoscaling_group_name,
-      instance_ids: [instance_id],
-      protected_from_scale_in: false
+      instance_ids: instance_ids,
+      protected_from_scale_in: enabled
     )
   end
 
   def run
-    if job_running?
-      if instance_protection_enabled?
-        return false
-      else
-        enable_instance_protection
-        Logger.new(STDOUT).info "Instance protection enabled on #{instance_id}"
-        return true
-      end
-    else
-      if instance_protection_enabled?
-        disable_instance_protection
-        Logger.new(STDOUT).info "Instance protection disabled on #{instance_id}"
-        return true
-      else
-        return false
-      end
-    end
+    update_instance_protection(busy_worker_ids, true)
+    update_instance_protection(free_worker_ids, false)
   end
 end
