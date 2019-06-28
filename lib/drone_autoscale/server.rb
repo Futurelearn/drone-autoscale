@@ -3,19 +3,21 @@ require 'json'
 require 'httparty'
 
 class Server
-  attr_reader :host, :drone_api_token, :namespace, :client
+  attr_reader :host, :drone_api_token, :namespace, :client, :enable_office_hours
 
   def initialize(
     aws_region: 'eu-west-1',
     host: 'http://localhost',
     namespace: 'Drone',
-    drone_api_token: nil
+    drone_api_token: nil,
+    enable_office_hours: true
   )
     raise StandardError.new("Must provide Drone API token") if drone_api_token.nil?
     @client = Aws::CloudWatch::Client.new(region: aws_region)
     @host = host
     @namespace = namespace
     @drone_api_token = drone_api_token
+    @enable_office_hours = enable_office_hours
   end
 
   def api_stats
@@ -30,6 +32,8 @@ class Server
   end
 
   def office_hours
+    return true unless enable_office_hours
+
     return false if Date.today.saturday? || Date.today.sunday?
 
     Time.now < Time.parse('7pm') && Time.now > Time.parse('7am')

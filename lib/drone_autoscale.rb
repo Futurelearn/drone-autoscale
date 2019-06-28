@@ -33,6 +33,7 @@ class DroneAutoScale < Thor
   method_option :namespace, default: ENV['DRONE_AUTOSCALE_NAMESPACE'] || 'Drone'
   method_option :drone_api_token, default: ENV['DRONE_AUTOSCALE_API_TOKEN']
   method_option :polling_time, type: :numeric, default: ENV['DRONE_AUTOSCALE_POLLING_TIME'] || '20'
+  method_option :enable_office_hours, default: ENV['DRONE_AUTOSCALE_ENABLE_OFFICE_HOURS'] || true
   def server
     Logger.new(STDOUT).info "Server: started"
     loop do
@@ -41,7 +42,8 @@ class DroneAutoScale < Thor
           host: options[:host],
           aws_region: options[:aws_region],
           namespace: options[:namespace],
-          drone_api_token: options[:drone_api_token]
+          drone_api_token: options[:drone_api_token],
+          enable_office_hours: options[:enable_office_hours]
         ).run
       rescue => e
         Logger.new(STDERR).error e.to_s
