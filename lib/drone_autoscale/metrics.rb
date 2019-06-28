@@ -4,27 +4,21 @@ require 'aws-sdk-cloudwatch'
 require_relative 'api'
 
 class Metrics
-  attr_reader :host, :drone_api_token, :namespace, :cloudwatch, :asg, :group_name_query, :enable_office_hours
+  attr_reader :api, :namespace, :cloudwatch, :asg, :group_name_query, :enable_office_hours
 
-  def initialize(
+  def initialize(api,
     aws_region: 'eu-west-1',
-    drone_api_token: nil,
     group_name_query: 'drone-agent',
     host: 'http://localhost',
     namespace: 'Drone',
     enable_office_hours: true
   )
+    @api = api
     @cloudwatch = Aws::CloudWatch::Client.new(region: aws_region)
     @asg = Aws::AutoScaling::Client.new(region: aws_region)
-    @host = host
     @namespace = namespace
-    @drone_api_token = drone_api_token
     @group_name_query = group_name_query
     @enable_office_hours = enable_office_hours
-  end
-
-  def api
-    API.new(host: host, drone_api_token: drone_api_token).queue
   end
 
   def current_worker_count

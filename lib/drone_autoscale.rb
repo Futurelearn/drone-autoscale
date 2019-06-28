@@ -1,5 +1,6 @@
 require 'optimist'
 
+require_relative 'drone_autoscale/api'
 require_relative 'drone_autoscale/instance_protection'
 require_relative 'drone_autoscale/metrics'
 
@@ -16,21 +17,23 @@ class DroneAutoScale
     end
   end
 
+  def self.api
+    API.new(drone_api_token: opts[:drone_api_token], host: opts[:host]).queue
+  end
+
   def self.daemon
     loop do
       begin
-        InstanceProtection.new(
+        api_result = api
+
+        InstanceProtection.new(api_result,
           aws_region: opts[:aws_region],
-          drone_api_token: opts[:drone_api_token],
           group_name_query: opts[:group_name_query],
-          host: opts[:host]
         ).run
 
-        Metrics.new(
-          host: opts[:host],
+        Metrics.new(api_result,
           aws_region: opts[:aws_region],
           namespace: opts[:namespace],
-          drone_api_token: opts[:drone_api_token],
           enable_office_hours: opts[:enable_office_hours]
         ).run
 

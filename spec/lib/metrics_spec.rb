@@ -8,11 +8,12 @@ require 'drone_autoscale/metrics'
 
 RSpec.describe Metrics do
   let(:api_endpoint) { "http://localhost/api/queue" }
-  let(:drone_api_token) { "some-fake-token" }
   let(:api_result) { File.read('spec/fixtures/files/default_api.json') }
 
   let(:asg) { Aws::AutoScaling::Client.new(stub_responses: true) }
   let(:cloudwatch) { double(:cloudwatch) }
+
+  let(:api) { API.new(drone_api_token: 'some-fake-token').queue }
 
   before(:each) do
     allow(Aws::CloudWatch::Client).to receive(:new).and_return(cloudwatch)
@@ -42,24 +43,10 @@ RSpec.describe Metrics do
       ]
     })
 
-    stub_request(:get, api_endpoint).to_return(body: api_result)
+    stub_request(:get, 'http://localhost/api/queue').to_return(body: api_result)
   end
 
-  subject { described_class.new(drone_api_token: drone_api_token) }
-
-  describe '#api' do
-    it 'should contain the authorization header' do
-      subject.api
-      expect(WebMock).to have_requested(:get, api_endpoint).with { |request|
-        expect(request.headers).to include('Authorization' => 'some-fake-token')
-      }
-    end
-
-    it 'returns JSON of build queue' do
-      result = subject.api
-      expect(result).to eq(JSON.load(api_result))
-    end
-  end
+  subject { described_class.new(api) }
 
   describe '#idle_workers' do
     it 'returns the number of idle workers/agents' do
@@ -81,6 +68,7 @@ RSpec.describe Metrics do
       it 'if pending jobs is 1 or more, return the number of pending jobs' do
         stub_request(:get, api_endpoint)
           .to_return(body: File.read('spec/fixtures/files/pending_api.json'))
+
         expect(subject.required_workers).to eq(4)
       end
 

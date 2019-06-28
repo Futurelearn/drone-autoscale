@@ -4,18 +4,10 @@ require 'webmock/rspec'
 require 'drone_autoscale'
 
 RSpec.describe DroneAutoScale do
-  describe '#agent' do
+  describe '#daemon' do
     it 'should exit when endpoints are unavailable' do
       WebMock.allow_net_connect!
-      expect { described_class.start(['agent']) }.to raise_exception(SystemExit)
-      WebMock.disable_net_connect!
-    end
-  end
-
-  describe '#server' do
-    it 'should exit when endpoints are unavailable' do
-      WebMock.allow_net_connect!
-      expect { described_class.start(['server']) }.to raise_exception(SystemExit)
+      expect { described_class.daemon }.to raise_exception(SystemExit)
       WebMock.disable_net_connect!
     end
   end

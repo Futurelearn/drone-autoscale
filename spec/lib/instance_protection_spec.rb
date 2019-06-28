@@ -5,10 +5,11 @@ require 'drone_autoscale/instance_protection'
 
 RSpec.describe InstanceProtection do
   let(:api_endpoint) { "http://localhost/api/queue" }
-  let(:drone_api_token) { "some-fake-token" }
   let(:api_result) { File.read('spec/fixtures/files/two_running_api.json') }
 
   let(:asg) { Aws::AutoScaling::Client.new(stub_responses: true) }
+
+  let(:api) { API.new(drone_api_token: 'some-fake-token').queue }
 
   before(:each) do
     allow(Aws::AutoScaling::Client).to receive(:new).and_return(asg)
@@ -63,7 +64,7 @@ RSpec.describe InstanceProtection do
     stub_request(:get, api_endpoint).to_return(body: api_result)
   end
 
-  subject { described_class.new(drone_api_token: drone_api_token) }
+  subject { described_class.new(api) }
 
   describe '#all_available_worker_ids' do
     it 'returns an array of instance IDs in the autoscaling group' do

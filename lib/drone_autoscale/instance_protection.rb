@@ -5,23 +5,16 @@ require 'aws-sdk-autoscaling'
 require_relative 'api'
 
 class InstanceProtection
-  attr_reader :aws_region, :drone_api_token, :host, :asg, :group_name_query
+  attr_reader :api, :aws_region, :asg, :group_name_query
 
-  def initialize(
+  def initialize(api,
     aws_region: 'eu-west-1',
-    drone_api_token: nil,
-    group_name_query: 'drone-agent',
-    host: 'http://localhost'
+    group_name_query: 'drone-agent'
   )
+    @api = api
     @aws_region = aws_region
-    @drone_api_token = drone_api_token
-    @host = host
     @group_name_query = group_name_query
     @asg = Aws::AutoScaling::Client.new(region: aws_region)
-  end
-
-  def api
-    API.new(host: host, drone_api_token: drone_api_token).queue
   end
 
   def autoscaling_group_name
