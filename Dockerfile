@@ -11,4 +11,3 @@ ENV PATH="/opt/bin:${PATH}"
 RUN bundle install --without=test --without=development
 
 ENTRYPOINT ["drone-autoscale"]
-CMD ["agent"]
