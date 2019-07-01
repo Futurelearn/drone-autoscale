@@ -25,7 +25,7 @@ class Metrics
   end
 
   def idle_workers
-    idle = current_worker_count - total_jobs
+    idle = current_worker_count - running_jobs
     return 0 if idle < 0
     idle
   end
@@ -39,9 +39,13 @@ class Metrics
   end
 
   def required_workers
+    # Signifies an issue with agents if workers are not being assigned jobs,
+    # and rather than cause an agent explosion, investigate the agents
+    return 0 if idle_workers.positive? && pending_jobs.positive?
+
     # If there is more than 1 pending jobs, return the amount
     # for rapid scaling up
-    return pending_jobs if pending_jobs >= 1
+    return pending_jobs if pending_jobs.positive?
 
     if office_hours
       # There are no idle workers, create one
