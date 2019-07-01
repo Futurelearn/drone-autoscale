@@ -64,7 +64,8 @@ RSpec.describe InstanceProtection do
     stub_request(:get, api_endpoint).to_return(body: api_result)
   end
 
-  subject { described_class.new(api) }
+  let(:autoscaling_instances) { Aws::AutoScaling::Client.new.describe_auto_scaling_instances.auto_scaling_instances }
+  subject { described_class.new(api, autoscaling_instances: autoscaling_instances) }
 
   describe '#all_available_worker_ids' do
     it 'returns an array of instance IDs in the autoscaling group' do

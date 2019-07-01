@@ -5,25 +5,22 @@ require 'aws-sdk-autoscaling'
 require_relative 'api'
 
 class InstanceProtection
-  attr_reader :api, :aws_region, :asg, :group_name_query
+  attr_reader :api, :aws_region, :asg, :autoscaling_instances, :autoscaling_group_name
 
   def initialize(api,
-    aws_region: 'eu-west-1',
-    group_name_query: 'drone-agent'
+    autoscaling_instances:,
+    aws_region: 'eu-west-2',
+    autoscaling_group_name: 'drone-agent'
   )
     @api = api
-    @aws_region = aws_region
-    @group_name_query = group_name_query
+    @autoscaling_instances = autoscaling_instances
     @asg = Aws::AutoScaling::Client.new(region: aws_region)
-  end
-
-  def autoscaling_group_name
-    asg.describe_auto_scaling_groups.auto_scaling_groups.detect {|g| g.auto_scaling_group_name =~ /^#{group_name_query}.*$/ }.auto_scaling_group_name
+    @autoscaling_group_name = autoscaling_group_name
   end
 
   # List all worker instance IDs in an autoscaling group
   def all_available_worker_ids
-    asg.describe_auto_scaling_instances.auto_scaling_instances.select {|s| s.auto_scaling_group_name == autoscaling_group_name && s.lifecycle_state =~ /^InService|Pending$/ }.map(&:instance_id)
+    autoscaling_instances.map(&:instance_id)
   end
 
   def busy_worker_ids
@@ -38,7 +35,7 @@ class InstanceProtection
     return if instance_ids.empty?
 
     if enabled
-      Logger.new(STDOUT).info "Enabling instance protection on #{instance_ids.join(' ')}"
+      Logger.new(STDOUT).info "Ensuring instance protection on #{instance_ids.join(' ')}"
     else
       Logger.new(STDOUT).info "Disabling instance protection on #{instance_ids.join(' ')}"
     end

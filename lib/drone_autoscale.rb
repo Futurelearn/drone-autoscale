@@ -1,4 +1,5 @@
 require 'optimist'
+require 'aws-sdk-autoscaling'
 
 require_relative 'drone_autoscale/api'
 require_relative 'drone_autoscale/instance_protection'
@@ -17,21 +18,23 @@ class DroneAutoScale
     end
   end
 
-  def self.api
-    API.new(drone_api_token: opts[:drone_api_token], host: opts[:host]).queue
-  end
-
   def self.daemon
     loop do
       begin
-        api_result = api
+        asg = Aws::AutoScaling::Client.new(region: opts[:aws_region])
+        group = asg.describe_auto_scaling_groups.auto_scaling_groups.detect {|g| g.auto_scaling_group_name =~ /#{opts[:group_name_query]}/ }
+        autoscaling_group_name = group.auto_scaling_group_name
+        autoscaling_group_instances = group.instances.select {|i| i.lifecycle_state =~ /InService|Pending/ }
 
-        InstanceProtection.new(api_result,
+        api = API.new(drone_api_token: opts[:drone_api_token], host: opts[:host]).queue
+        InstanceProtection.new(api,
+          autoscaling_instances: autoscaling_group_instances,
           aws_region: opts[:aws_region],
-          group_name_query: opts[:group_name_query],
+          autoscaling_group_name: autoscaling_group_name
         ).run
 
-        Metrics.new(api_result,
+        Metrics.new(api,
+          autoscaling_instances: autoscaling_group_instances,
           aws_region: opts[:aws_region],
           namespace: opts[:namespace],
           enable_office_hours: opts[:enable_office_hours]

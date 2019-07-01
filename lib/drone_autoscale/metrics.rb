@@ -1,28 +1,27 @@
-require 'aws-sdk-autoscaling'
 require 'aws-sdk-cloudwatch'
+require 'aws-sdk-autoscaling'
 
 require_relative 'api'
 
 class Metrics
-  attr_reader :api, :namespace, :cloudwatch, :asg, :group_name_query, :enable_office_hours
+  attr_reader :api, :autoscaling_instances, :namespace, :cloudwatch, :enable_office_hours
 
   def initialize(api,
-    aws_region: 'eu-west-1',
-    group_name_query: 'drone-agent',
+    autoscaling_instances:,
+    aws_region: 'eu-west-2',
     host: 'http://localhost',
     namespace: 'Drone',
     enable_office_hours: true
   )
     @api = api
     @cloudwatch = Aws::CloudWatch::Client.new(region: aws_region)
-    @asg = Aws::AutoScaling::Client.new(region: aws_region)
     @namespace = namespace
-    @group_name_query = group_name_query
     @enable_office_hours = enable_office_hours
+    @autoscaling_instances = autoscaling_instances
   end
 
   def current_worker_count
-    asg.describe_auto_scaling_instances.auto_scaling_instances.select {|s| s.auto_scaling_group_name =~ /^#{group_name_query}.*$/ && s.lifecycle_state =~ /^InService|Pending$/ }.length
+    autoscaling_instances.length
   end
 
   def idle_workers

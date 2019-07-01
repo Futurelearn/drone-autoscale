@@ -46,7 +46,8 @@ RSpec.describe Metrics do
     stub_request(:get, 'http://localhost/api/queue').to_return(body: api_result)
   end
 
-  subject { described_class.new(api) }
+  let(:autoscaling_instances) { Aws::AutoScaling::Client.new.describe_auto_scaling_instances.auto_scaling_instances }
+  subject { described_class.new(api, autoscaling_instances: autoscaling_instances) }
 
   describe '#idle_workers' do
     it 'returns the number of idle workers/agents' do
