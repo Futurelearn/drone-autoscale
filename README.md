@@ -1,22 +1,25 @@
 # Drone Autoscale
 
-This is a service which operates in either `server` or `agent` mode, both which
-provide two different functions.
+This is a service which provides two functions:
+
+ - Cloudwatch metric collection for use with AWS autoscaling group alarms
+ - Automated enabling (and disabling) of instances running jobs
 
 It is intended to provide everything required to configure AWS autoscaling
 groups. The autoscaling configuration should be applied independently.
 
 The service is provided as a
 [container](https://hub.docker.com/r/futurelearn/drone-autoscale/), and I
-recommend running it this way alongside Drone.
+recommend running it this way alongside Drone. It runs alongside the Drone
+server, using the API to calculate the required number of workers.
 
 The installation instructions are based upon working with [Docker
 Compose](https://docs.docker.com/compose/).
 
-It assumes the use of IAM credentials attached to an EC2 instance rather than
-using IAM user access keys.
+> Note: It assumes the use of IAM credentials attached to an EC2 instance
+> rather than using IAM user access keys.
 
-## Server mode
+## Metrics
 
 Pushes server statistics to [Amazon
 Cloudwatch](https://aws.amazon.com/cloudwatch/) as gathered using the [Drone
@@ -43,40 +46,15 @@ variables.
 It requires a [Drone API token](http://docs.drone.io/api-authentication/) for an
 user. Set this under `DRONE_AUTOSCALE_API_TOKEN`.
 
-To install, add the configuration alongside your Drone server in the Docker
-Compose file:
-
-```
-version: '2'
-
-services:
-  drone-server:
-    image: drone/drone:0.8
-    ports:
-      - 80:8000
-      - 9000:9000
-    volumes:
-      - /var/lib/drone:/var/lib/drone/
-    restart: always
-  drone-autoscale:
-    image: futurelearn/drone-autoscale
-    restart: on-failure
-    command: server
-    depends_on:
-      - drone-server
-    environment:
-      DRONE_AUTOSCALE_HOST: http://drone-server:8000
-      DRONE_AUTOSCALE_API_TOKEN: <provide a Drone user API token>
-```
-
-## Agent mode
+## Instance protection
 
 Sets the [Instance
 Protection](https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-instance-termination.html)
 status of an EC2 instance depending on whether a job is running on the agent,
 using the `/varz` agent endpoint.
 
-This mode requires the instance to have the following IAM permissions set:
+This mode requires the Drone server instance to have the following IAM
+permissions set:
 
 ```
 {
@@ -105,36 +83,46 @@ This mode requires the instance to have the following IAM permissions set:
 }
 ```
 
-It will find the correct autoscaling group by searching what is set by
-`DRONE_AUTOSCALE_GROUP_NAME_QUERY`. The reason it does a lookup is to help the
-automation of deleting and recreating autoscaling groups where the name may
-change (for example, when using the
-[`name_prefix`](https://www.terraform.io/docs/providers/aws/r/autoscaling_group.html#name_prefix)
-setting).
+## Install
 
-Set your Compose file:
+To install, add the configuration alongside your Drone server in the Docker
+Compose file:
 
 ```
+version: '2'
+
 services:
-  drone-agent:
-    image: drone/agent:0.8
+  drone-server:
+    image: drone/drone:1.2
     ports:
-      - 3000:3000
-    command: agent
-    restart: always
+      - 80:80
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/drone:/var/lib/drone/
+    restart: always
   drone-autoscale:
     image: futurelearn/drone-autoscale
     restart: on-failure
+    command: server
     depends_on:
-      - drone-agent
+      - drone-server
     environment:
-      DRONE_AUTOSCALE_HOST: http://drone-agent:3000
+      # API token to authenticate with Drone API
+      DRONE_AUTOSCALE_API_TOKEN: <provide a Drone user API token>
+      # AWS region
+      DRONE_AUTOSCALE_AWS_REGION: eu-west-2
+      # Find the agent autoscaling group based upon the name
       DRONE_AUTOSCALE_GROUP_NAME_QUERY: drone-agent
+      # Endpoint for the Drone API
+      DRONE_AUTOSCALE_HOST: http://drone-server
+      # Cloudwatch namespace where metrics will be published
+      DRONE_AUTOSCALE_NAMESPACE: Drone
 ```
 
 ## Configuring autoscaling policies
 
 See the [AWS documentation on
 autoscaling](https://docs.aws.amazon.com/autoscaling/ec2/userguide/GettingStartedTutorial.html).
+
+It publishes a metric named "RequiredWorkers" which can be used as a guage for
+how many workers to create or remove. It publishes both positive and negative
+numbers.
